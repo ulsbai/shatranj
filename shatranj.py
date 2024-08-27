@@ -1,7 +1,10 @@
 #!/usr/bin/env python 
 
-import string,time,random,cPickle,bisect,profile
+import string,time,random,pickle,bisect,profile
 import sys,select,types,math
+
+import numpy as np
+
 try:
     import signal
 except:
@@ -68,10 +71,10 @@ class Move:
         self.promoted_piece = promoted_piece
 
     def __repr__(self):
-        print "Move: from square = %s  to square = %s  name = %s" % \
-              (bin2alg[self.from_square],bin2alg[self.to_square],self.move_name)
-        print "       captured piece = %s  promoted piece = %s" % \
-              (str(self.captured_piece),str(self.promoted_piece))
+        print("Move: from square = %s  to square = %s  name = %s" % \
+              (bin2alg[self.from_square],bin2alg[self.to_square],self.move_name))
+        print("       captured piece = %s  promoted piece = %s" % \
+              (str(self.captured_piece),str(self.promoted_piece)))
 
         return("")
         
@@ -91,8 +94,8 @@ class Position:
         self.attacks_from = {}
         self.attacks_to = {}
         for i in range(64):
-            self.attacks_from[1L<<i] = 0
-            self.attacks_to[1L<<i] = 0
+            self.attacks_from[1<<i] = 0
+            self.attacks_to[1<<i] = 0
         self.attacks_to[0] = 0
         self.attacks_from[0] = 0 
         self.move_history = []
@@ -173,15 +176,15 @@ class Position:
                 if (j in "12345678"): # we have a space, move the index
                     index -= int(j)
                 else:  # we have a piece
-                    self.piece_bb[j] |= 1L<<index
-                    self.piece_name[1L<<index] = j
+                    self.piece_bb[j] |= 1<<index
+                    self.piece_name[1<<index] = j
                     self.piece_count[j] += 1
                     index -= 1
 
         # Initialize the hash index for the transition tables
         for i in range(64):
-            if (self.piece_name.has_key(1L<<i)):
-                self.hash_index[i] = self.piece_name[1L<<i]
+            if (1<<i in self.piece_name):
+                self.hash_index[i] = self.piece_name[1<<i]
             else:
                 self.hash_index[i] = '-'
 
@@ -195,22 +198,22 @@ class Position:
     def __repr__(self):
         white = 1
         for r in range(8,0,-1):
-            print "\n    +---+---+---+---+---+---+---+---+"
-            print " ",r, "|",
+            print("\n    +---+---+---+---+---+---+---+---+")
+            print(" ",r, "|", end=' ')
             for f in "abcdefgh":
                 name = "%s%s" % (f,r)
                 bb = alg2bin[name]
-                if (self.piece_name.has_key(bb)):
-                    print self.piece_name[bb],"|",
+                if (bb in self.piece_name):
+                    print(self.piece_name[bb],"|", end=' ')
                 else:
                     if (white):
-                        print " ","|",
+                        print(" ","|", end=' ')
                     else:
-                        print ".","|",
+                        print(".","|", end=' ')
                 white ^= 1
             white ^= 1
-        print "\n    +---+---+---+---+---+---+---+---+"
-        print "      a   b   c   d   e   f   g   h  \n"
+        print("\n    +---+---+---+---+---+---+---+---+")
+        print("      a   b   c   d   e   f   g   h  \n")
         return("")
 
     def generate_moves (self,wtm):
@@ -247,8 +250,8 @@ class Position:
         # check to make sure we have a king.
         # If we don't, we shouldn't be here.
         if (king == 0):
-            print "Error: one of the kings is missing."
-            print self #display(position)
+            print("Error: one of the kings is missing.")
+            print(self) #display(position)
             sys.exit()
             return(([],[]))
 
@@ -302,9 +305,9 @@ class Position:
                 else:                             # empty square
                     move_list.append(Move(from_square,to_square,"","",""))            
 
-                moves = ((moves) & ((moves) - 1L))
+                moves = ((moves) & ((moves) - 1))
 
-            pieces = ((pieces) & ((pieces) - 1L))
+            pieces = ((pieces) & ((pieces) - 1))
 
         # try to castle.  If the king was in check, the moves are generated
         # in the check_evasions routine above.
@@ -321,12 +324,12 @@ class Position:
             attacked_qs = (attacks_to[c1] | \
                            attacks_to[d1]) & other_pieces
             if (self.w_rook_h1_move_count == 0 and \
-                piece_name.has_key(h1) and piece_name[h1] == 'R' and \
+                h1 in piece_name and piece_name[h1] == 'R' and \
                 not attacked_ks and not w_occupied_ks):
                 move_list.append(Move(piece,g1,"castle","",""))
 
             if (self.w_rook_a1_move_count == 0 and \
-                piece_name.has_key(a1) and piece_name[a1] == 'R' and \
+                a1 in piece_name and piece_name[a1] == 'R' and \
                 not attacked_qs and not w_occupied_qs):
                 move_list.append(Move(piece,c1,"castle","",""))
 
@@ -339,11 +342,11 @@ class Position:
             attacked_qs = (attacks_to[c8] | \
                            attacks_to[d8]) & other_pieces
             if (self.b_rook_h8_move_count == 0 and \
-                piece_name.has_key(h8) and piece_name[h8] == 'r' and \
+                h8 in piece_name and piece_name[h8] == 'r' and \
                 not attacked_ks and not b_occupied_ks):
                 move_list.append(Move(piece,g8,"castle","",""))
             if (self.b_rook_a8_move_count == 0 and \
-                piece_name.has_key(a8) and piece_name[a8] == 'r' and \
+                a8 in piece_name and piece_name[a8] == 'r' and \
                 not attacked_qs and not b_occupied_qs):
                 move_list.append(Move(piece,c8,"castle","",""))
 
@@ -375,7 +378,7 @@ class Position:
                 else:
                     move_list.insert(0,Move(from_square,to_square,"",
                                         piece_name[to_square],""))
-            left_captures = ((left_captures) & ((left_captures) - 1L))
+            left_captures = ((left_captures) & ((left_captures) - 1))
 
         while (right_captures):
             to_square = ((right_captures) & -(right_captures))
@@ -392,7 +395,7 @@ class Position:
                 else:
                     move_list.insert(0,Move(from_square,to_square,"",
                                         piece_name[to_square],""))
-            right_captures = ((right_captures) & ((right_captures) - 1L))
+            right_captures = ((right_captures) & ((right_captures) - 1))
 
         # produce en passant captures
         if (wtm and self.b_pawn_last_double_move):
@@ -469,7 +472,7 @@ class Position:
                     move_list.append(Move(from_square,to_square,"promotion","","Q"))
                 else:
                     move_list.append(Move(from_square,to_square,"","",""))
-            single_moves = ((single_moves) & ((single_moves) - 1L))
+            single_moves = ((single_moves) & ((single_moves) - 1))
 
         # produce double pawn moves
         while (double_moves):
@@ -482,7 +485,7 @@ class Position:
             if (mask & to_square):
                 #print "WE ARE HERE",bin2alg[from_square]
                 move_list.append(Move(from_square,to_square,"pawn double move","",""))
-            double_moves = ((double_moves) & ((double_moves) - 1L))
+            double_moves = ((double_moves) & ((double_moves) - 1))
 
         return(move_list)
 
@@ -533,8 +536,8 @@ class Position:
         # check to make sure we have a king.
         # If we don't, we shouldn't be here.
         if (king == 0):
-            print "Error: one of the kings is missing."
-            print self #display(position)
+            print("Error: one of the kings is missing.")
+            print(self) #display(position)
             sys.exit()
             return(([],[]))
 
@@ -684,12 +687,12 @@ class Position:
                            attacks_to[c1] |
                            attacks_to[d1]) & other_pieces
             if (self.w_rook_h1_move_count == 0 and \
-                piece_name.has_key(h1) and piece_name[h1] == 'R' and \
+                h1 in piece_name and piece_name[h1] == 'R' and \
                 not attacked_ks and not w_occupied_ks):
                 move_list.append(Move(piece,g1,"castle","",""))
 
             if (self.w_rook_a1_move_count == 0 and \
-                piece_name.has_key(a1) and piece_name[a1] == 'R' and \
+                a1 in piece_name and piece_name[a1] == 'R' and \
                 not attacked_qs and not w_occupied_qs):
                 move_list.append(Move(piece,c1,"castle","",""))
 
@@ -703,11 +706,11 @@ class Position:
                            attacks_to[c8] |
                            attacks_to[d8]) & other_pieces
             if (self.b_rook_h8_move_count == 0 and \
-                piece_name.has_key(h8) and piece_name[h8] == 'r' and \
+                h1 in piece_name and piece_name[h8] == 'r' and \
                 not attacked_ks and not b_occupied_ks):
                 move_list.append(Move(piece,g8,"castle","",""))
             if (self.b_rook_a8_move_count == 0 and \
-                piece_name.has_key(a8) and piece_name[a8] == 'r' and \
+                a8 in piece_name and piece_name[a8] == 'r' and \
                 not attacked_qs and not b_occupied_qs):
                 move_list.append(Move(piece,c8,"castle","",""))
 
@@ -735,7 +738,7 @@ class Position:
                 else:
                     move_list.insert(0,Move(from_square,to_square,"",
                                         piece_name[to_square],""))
-            left_captures = ((left_captures) & ((left_captures) - 1L))
+            left_captures = ((left_captures) & ((left_captures) - 1))
 
         while (right_captures):
             to_square = ((right_captures) & -(right_captures))
@@ -752,7 +755,7 @@ class Position:
                 else:
                     move_list.insert(0,Move(from_square,to_square,"",
                                         piece_name[to_square],""))
-            right_captures = ((right_captures) & ((right_captures) - 1L))
+            right_captures = ((right_captures) & ((right_captures) - 1))
 
         # produce en passant captures
         if (wtm and self.b_pawn_last_double_move):
@@ -827,7 +830,7 @@ class Position:
                     move_list.append(Move(from_square,to_square,"promotion","","Q"))
                 else:
                     move_list.append(Move(from_square,to_square,"","",""))
-            single_moves = ((single_moves) & ((single_moves) - 1L))
+            single_moves = ((single_moves) & ((single_moves) - 1))
 
         # produce double pawn moves
         while (double_moves):
@@ -840,7 +843,7 @@ class Position:
             if (mask & to_square):
                 #print "WE ARE HERE",bin2alg[from_square]
                 move_list.append(Move(from_square,to_square,"pawn double move","",""))
-            double_moves = ((double_moves) & ((double_moves) - 1L))
+            double_moves = ((double_moves) & ((double_moves) - 1))
 
         return(move_list)
 
@@ -896,7 +899,7 @@ class Position:
         # check to make sure we're in check
         king_attackers = attacks_to[king] & other_pieces
         if (not king_attackers):
-            print "Error: we're not in check.  We shouldn't be here."
+            print("Error: we're not in check.  We shouldn't be here.")
             return
 
         # Yikes! We're in check!
@@ -961,7 +964,7 @@ class Position:
                             move_list.insert(0,Move(attacker,king_attackers,"",
                                                     piece_name[king_attackers],""))
 
-                attacker_attackers = ((attacker_attackers) & ((attacker_attackers) - 1L))
+                attacker_attackers = ((attacker_attackers) & ((attacker_attackers) - 1))
 
 
         ############################################################################
@@ -999,7 +1002,7 @@ class Position:
                 elif (king_diag_nw == diag_mask_nw[attacker]):
                     attacker_masks |= king_diag_nw
 
-            attackers = ((attackers) & ((attackers) - 1L))
+            attackers = ((attackers) & ((attackers) - 1))
 
         while (moves):
             to_square = ((moves) & -(moves))
@@ -1028,7 +1031,7 @@ class Position:
                   (to_square & attacker_masks == 0)):
                 move_list.append(Move(king,to_square,"","",""))            
 
-            moves = ((moves) & ((moves) - 1L))
+            moves = ((moves) & ((moves) - 1))
         ############################################################################
         # option 3 Block
         ############################################################################
@@ -1075,7 +1078,7 @@ class Position:
                     mask = self.pinned(blocker,wtm)
                     if (mask & empty_square):
                         move_list.append(Move(blocker,empty_square,"","",""))
-                    blockers = ((blockers) & ((blockers) - 1L))
+                    blockers = ((blockers) & ((blockers) - 1))
 
                 # find the forward pawn that sits on the empty square
                 if (empty_square & forward_pawns):
@@ -1112,7 +1115,7 @@ class Position:
                                                  empty_square,
                                                  "pawn double move","",""))
 
-                moves = ((moves) & ((moves) - 1L))
+                moves = ((moves) & ((moves) - 1))
 
         return(move_list)
 
@@ -1126,8 +1129,8 @@ class Position:
         attacks_to = {}
 
         for i in range(64):
-            attacks_from[1L<<i] = 0
-            attacks_to[1L<<i] = 0
+            attacks_from[1<<i] = 0
+            attacks_to[1<<i] = 0
 
         all_pieces = piece_bb['b_occupied'] | piece_bb['w_occupied']
 
@@ -1156,9 +1159,9 @@ class Position:
             while (moves):
                 to_square = ((moves) & -(moves))
                 add_attacks(attacks_from,attacks_to,from_square,to_square)
-                moves = ((moves) & ((moves) - 1L))
+                moves = ((moves) & ((moves) - 1))
 
-            non_pawns = ((non_pawns) & ((non_pawns) - 1L))
+            non_pawns = ((non_pawns) & ((non_pawns) - 1))
 
         # produce pawn attacks.  These are not necessarily moves since
         # a piece has to be there for the pawn to move there.
@@ -1180,7 +1183,7 @@ class Position:
                 else:
                     from_square = to_square<<7
                 add_attacks(attacks_from,attacks_to,from_square,to_square)
-                left_captures = ((left_captures) & ((left_captures) - 1L))
+                left_captures = ((left_captures) & ((left_captures) - 1))
             while (right_captures):
                 to_square = ((right_captures) & -(right_captures))
                 if (wtm):
@@ -1188,7 +1191,7 @@ class Position:
                 else:
                     from_square = to_square<<9
                 add_attacks(attacks_from,attacks_to,from_square,to_square)
-                right_captures = ((right_captures) & ((right_captures) - 1L))
+                right_captures = ((right_captures) & ((right_captures) - 1))
 
             # produce en passant attacks
             # for en passant, the pawn really doesn't attack the
@@ -1269,7 +1272,7 @@ class Position:
                 file_pieces = file_mask[king] & all_pieces & ~square
                 if (file_attacks[attacker][file_pieces] & king):
                     mask = file_mask[king]
-                attackers = ((attackers) & ((attackers) - 1L))
+                attackers = ((attackers) & ((attackers) - 1))
 
         elif (rank_mask[square] & rank_mask[king] & attacks_to[square] & other_pieces):
             # remove the square and see if the king is attacked
@@ -1279,7 +1282,7 @@ class Position:
                 rank_pieces = rank_mask[king] & all_pieces & ~square
                 if (rank_attacks[attacker][rank_pieces] & king):
                     mask = rank_mask[king]
-                attackers = ((attackers) & ((attackers) - 1L))
+                attackers = ((attackers) & ((attackers) - 1))
 
         # The attacker is on the same diagonal as the king and the
         # pinned piece.
@@ -1292,7 +1295,7 @@ class Position:
                 if (diag_attacks_ne[attacker][ne_pieces] & king):
                     mask = diag_mask_ne[king]
 
-                attackers = ((attackers) & ((attackers) - 1L))
+                attackers = ((attackers) & ((attackers) - 1))
 
         elif (diag_mask_nw[square] & diag_mask_nw[king] & attacks_to[square] & other_pieces):
             # remove the square and see if the king is attacked
@@ -1302,7 +1305,7 @@ class Position:
                 nw_pieces = diag_mask_nw[king] & all_pieces & ~square
                 if (diag_attacks_nw[attacker][nw_pieces] & king):
                     mask = diag_mask_nw[king]
-                attackers = ((attackers) & ((attackers) - 1L))
+                attackers = ((attackers) & ((attackers) - 1))
 
         return(mask)
 
@@ -1382,7 +1385,7 @@ class Position:
             moves[regular_move] = m
             san = self.reg2san(m)
             # check to see if we have a conflict
-            if (moves.has_key(san)):
+            if (san in moves):
                 old_move = moves[san]
                 new_move = m
                 old_from_square = old_move.from_square
@@ -1430,7 +1433,7 @@ class Position:
         promoted_piece = move.promoted_piece
 
         if (DEBUG_MOVES):
-            print "make_move =",move
+            print("make_move =",move)
             
         from_piece = piece_name[from_square] # piece name
 
@@ -1448,14 +1451,14 @@ class Position:
         hash[FULL_MOVE_HASH_INDEX] += 0.5
 
         # any pawn move or capture should reset the 50 move rule counter
-        if (from_piece.upper() == 'P' or piece_name.has_key(to_square)):
+        if (from_piece.upper() == 'P' or to_square in piece_name):
             hash[HALF_MOVE_HASH_INDEX] = 0
             self.half_move_counter_list[-1] = 0
 
         # check if there is a captured piece
         # this is subtle: there is no pawn on the to_square
         # for an enpassant capture.  That is handled later.
-        if (piece_name.has_key(to_square)):
+        if (to_square in piece_name):
             to_piece = piece_name[to_square]
             # remove the captured piece from BB
             piece_bb[to_piece] = piece_bb[to_piece] & ~to_square
@@ -1470,7 +1473,7 @@ class Position:
                 elif (self.w_rook_h1_location == to_square):
                     self.w_rook_h1_location = -to_square
                 else:
-                    print "Error: make_move white rook at invalid location"
+                    print("Error: make_move white rook at invalid location")
 
             elif (to_piece == "r"):
                 if (self.b_rook_a8_location == to_square):
@@ -1478,7 +1481,7 @@ class Position:
                 elif (self.b_rook_h8_location == to_square):
                     self.b_rook_h8_location = -to_square
                 else:
-                    print "Error: make_move black rook at invalid location"
+                    print("Error: make_move black rook at invalid location")
 
         # move the piece to new square on board
         piece_name[to_square] = piece_name[from_square]
@@ -1519,7 +1522,7 @@ class Position:
                 self.b_rook_a8_move_count += 1
                 self.b_rook_a8_location = d8
             else:
-                print "Error: Invalid castle move %s-%s" % move
+                print("Error: Invalid castle move %s-%s" % move)
 
             # remove old rook
             piece_bb[rook] = piece_bb[rook] & ~from_rook
@@ -1542,7 +1545,7 @@ class Position:
                 removed_pawn_square = to_square << 8 
                 pawn = "P"
             else:
-                print "Error: Invalid en passant move %s-%s" % move
+                print("Error: Invalid en passant move %s-%s" % move)
             # remove captured pawn
             piece_bb[pawn] = piece_bb[pawn] & ~removed_pawn_square
             del piece_name[removed_pawn_square]
@@ -1635,7 +1638,7 @@ class Position:
             hash_index = str(self.hash_index[0:64])
             # get the current array...it's last in the list
             current_array = dict(self.position_counter_array_list[-1])
-            if (current_array.has_key(hash_index)):
+            if (hash_index in current_array):
                 current_array[hash_index] += 1
             else:
                 current_array[hash_index] = 1
@@ -1660,7 +1663,7 @@ class Position:
         hash = self.hash_index
 
         if (DEBUG_MOVES):
-            print "unmake_move =",move
+            print("unmake_move =",move)
 
         if (hash[MOVER_HASH_INDEX] == "wtm"):
             hash[MOVER_HASH_INDEX] = "btm"
@@ -1738,7 +1741,7 @@ class Position:
                 self.b_rook_a8_move_count -= 1
                 self.b_rook_a8_location = a8
             else:
-                print "Error: Invalid castle move %s-%s" % move
+                print("Error: Invalid castle move %s-%s" % move)
             # remove old rook
             piece_bb[rook] = piece_bb[rook] & ~from_rook
             del piece_name[from_rook]
@@ -1765,7 +1768,7 @@ class Position:
                 self.w_pawn_last_double_move = removed_pawn_square
                 pawn = "P"
             else:
-                print "Error: Invalid en passant move %s-%s" % move
+                print("Error: Invalid en passant move %s-%s" % move)
             # add back captured pawn
             piece_bb[pawn] = piece_bb[pawn] | removed_pawn_square
             piece_name[removed_pawn_square] = pawn
@@ -1852,7 +1855,7 @@ class Position:
         and the number of pieces it defends. We pick only the top
         few moves.  We also consider whether we are attacked.
         """
-        print "order_moves: starting"
+        print("order_moves: starting")
         if (wtm):
             other_pieces = 'b_occupied'
             our_pieces = 'w_occupied'
@@ -1958,7 +1961,7 @@ class Position:
             # if there is no opponent piece blocking it, it is worth more.
             if (file_mask[pawn] & black_pieces & above[pawn] == 0):
                 value += PASSED_PAWN_UNBLOCKED_MULT * rank[pawn]
-            wp = ((wp) & ((wp) - 1L))
+            wp = ((wp) & ((wp) - 1))
 
         # 2b. evaluate black passed pawns 
         wp = piece_bb['P']
@@ -1982,7 +1985,7 @@ class Position:
             # if there is no opponent piece blocking it, it is worth more.
             if (file_mask[pawn] & white_pieces & below[pawn] == 0):
                 value -= PASSED_PAWN_UNBLOCKED_MULT * (8 - rank[pawn])
-            bp = ((bp) & ((bp) - 1L))
+            bp = ((bp) & ((bp) - 1))
 
         # 3. Piece Position add in the rest of the piece square values
         #    for the rest of the pieces
@@ -1992,7 +1995,7 @@ class Position:
             while (bb):
                 loc = ((bb) & -(bb))
                 value += multiplier * piece_square_value[name][loc]
-                bb = ((bb) & ((bb) - 1L))
+                bb = ((bb) & ((bb) - 1))
 
             # since we need to subtract the black values, invert multiplier
             multiplier *= -1
@@ -2049,7 +2052,7 @@ class Position:
                           (diag_attacks_ne[from_square & queen_bishops][ne_pieces] & ~all_pieces)  | \
                           (diag_attacks_nw[from_square & queen_bishops][nw_pieces] & other_pieces) | \
                           (diag_attacks_nw[from_square & queen_bishops][nw_pieces] & ~all_pieces))
-                pieces = ((pieces) & ((pieces) - 1L))
+                pieces = ((pieces) & ((pieces) - 1))
 
             value += MOBILITY_VALUE * multiplier * nipc(moves)
             multiplier *= -1
@@ -2061,7 +2064,7 @@ class Position:
         # if a repetition is detected, we need to adjust the evaluation 
         #hash_index = str(self.hash_index[:64])
         #current_array = self.position_counter_array_list[-1]
-        #if (current_array.has_key(hash_index) and \
+        #if (hash index in current_array and \
         #    current_array[hash_index] >= 2):
         #    print "Repetition check",current_array[hash_index]
         #    if (wtm):
@@ -2113,7 +2116,7 @@ def clear_lsb (b):
     """
     Clear the ( and return the number. & - and return the number.)
     """
-    return(b & (b-1L))
+    return(b & (b-1))
 
 def msb (b=0):
     """
@@ -2122,7 +2125,7 @@ def msb (b=0):
     """
     while b != 0:
         msb = b
-        b = ((b) & ((b) - 1L))
+        b = ((b) & ((b) - 1))
     return(msb)
 
 def lsb2 (b):
@@ -2130,7 +2133,7 @@ def lsb2 (b):
     Yet another way of calculating LSB.  This is slower then lsb().
     lsb = msb(b XOR (b-1)))
     """
-    return(msb(b ^ (b-1L)))
+    return(msb(b ^ (b-1)))
 
 def msb2 (b=0):
     """
@@ -2185,77 +2188,77 @@ def display (x=None):
 
 def display_position (position=None):
     if (not position):
-        print "Error: display missing position"
+        print("Error: display missing position")
         return
     piece_name = self.piece_name
     white = 1
     for r in range(8,0,-1):
-        print "\n    +---+---+---+---+---+---+---+---+"
-        print " ",r, "|",
+        print("\n    +---+---+---+---+---+---+---+---+")
+        print(" ",r, "|", end=' ')
         for f in "abcdefgh":
             name = "%s%s" % (f,r)
             bb = alg2bin[name]
-            if (piece_name.has_key(bb)):
-                print piece_name[bb],"|",
+            if (bb in piece_name):
+                print(piece_name[bb],"|", end=' ')
             else:
                 if (white):
-                    print " ","|",
+                    print(" ","|", end=' ')
                 else:
-                    print ".","|",
+                    print(".","|", end=' ')
             white ^= 1
         white ^= 1
-    print "\n    +---+---+---+---+---+---+---+---+"
-    print "      a   b   c   d   e   f   g   h  \n"
+    print("\n    +---+---+---+---+---+---+---+---+")
+    print("      a   b   c   d   e   f   g   h  \n")
     return
 
 def display_bb (bb=None):
     if (bb == None):
-        print "Error: display missing BitBoard"
+        print("Error: display missing BitBoard")
         return
     white = 1
     for r in range(8,0,-1):
-        print "\n    +---+---+---+---+---+---+---+---+"
-        print " ",r, "|",
+        print("\n    +---+---+---+---+---+---+---+---+")
+        print(" ",r, "|", end=' ')
         for f in range(8,0,-1):
-            val = (8L * (r - 1L)) + (f - 1L)
+            val = (8 * (r - 1)) + (f - 1)
             if ((1<<val) & bb):
-                print '1',"|",
+                print('1',"|", end=' ')
             else:
                 if (white):
-                    print " ","|",
+                    print(" ","|", end=' ')
                 else:
-                    print ".","|",
+                    print(".","|", end=' ')
             white ^= 1
         white ^= 1
-    print "\n    +---+---+---+---+---+---+---+---+"
-    print "      a   b   c   d   e   f   g   h  \n"
+    print("\n    +---+---+---+---+---+---+---+---+")
+    print("      a   b   c   d   e   f   g   h  \n")
     return
 
 def display_attacks (position=None):
     if (not position):
-        print "Error: display missing position"
+        print("Error: display missing position")
         return
     from_keys = position["attacks_from"].keys()
     for i in from_keys:
         attacks = position["attacks_from"][i]
         if (attacks):
-            print "\nattacks from %s to " % (bin2alg[i]),
+            print("\nattacks from %s to " % (bin2alg[i]), end=' ')
         while (attacks):
             to_square = ((attacks) & -(attacks))
-            print "%s " % (bin2alg[to_square]),
-            attacks = ((attacks) & ((attacks) - 1L))
+            print("%s " % (bin2alg[to_square]), end=' ')
+            attacks = ((attacks) & ((attacks) - 1))
             
-    print
+    print()
     to_keys = position["attacks_to"].keys()
     for i in to_keys:
         attacks = position["attacks_to"][i]
         if (attacks):
-            print "\nattacks to %s from " % (bin2alg[i]),
+            print("\nattacks to %s from " % (bin2alg[i]), end=' ')
         while (attacks):
             from_square = ((attacks) & -(attacks))
-            print "%s " % (bin2alg[from_square]),
-            attacks = ((attacks) & ((attacks) - 1L))
-    print
+            print("%s " % (bin2alg[from_square]), end=' ')
+            attacks = ((attacks) & ((attacks) - 1))
+    print()
     return
 
 def pb (b):
@@ -2263,7 +2266,7 @@ def pb (b):
     buff = ''
     for i in range(8):
         buff = '%08d\n%s' % (int(tobase((255 & (b>>(i*8))),2)),buff)
-    print buff
+    print(buff)
     return
 
 def mainloop2 ():
@@ -2292,7 +2295,7 @@ def mainloop2 ():
             temp_count = count - temp_count
             message = 'keepalive diff=%s current=%16.6f count=%s' % \
                       (diff,current,temp_count)
-            print message
+            print(message)
             temp_count=count
             send_time = current
         count = count+1
@@ -2300,16 +2303,16 @@ def mainloop2 ():
         rl,wl,el = selector(readlist,emptylist,emptylist,0)
         for foo in rl:
             myline = reader()
-            print "Got line", myline
+            print("Got line", myline)
     return
 
 def get_position (board={}):
     position = zero_position()
     for i in range(64):
-        bin = 1L<<i
-        if (board.has_key(bin)):
+        bin = 1<<i
+        if (bin in board):
             piece = board[bin]
-            if (position.has_key(piece)):
+            if (piece in position):
                 position[piece] |= bin
             else:
                 position[piece] = bin
@@ -2322,7 +2325,7 @@ def get_board (position={}):
         while (piece):
             one_piece = ((piece) & -(piece))
             board[one_piece]=i
-            piece = ((piece) & ((piece) - 1L))
+            piece = ((piece) & ((piece) - 1))
     return(board)
    
 def add_attacks (attacks_from,attacks_to,from_square,to_square):
@@ -2347,9 +2350,9 @@ def get_conversions ():
     for i in range(1,9):
         for j in 'hgfedcba':
             name = '%s%s' % (j,i)
-            bin2alg[1L<<count] = name     # bin2alg[1<<7] = 'a1'
-            alg2bin[name] = 1L<<count
-            bin2index[1L<<count] = count  # bin2index[a1] = 7
+            bin2alg[1<<count] = name     # bin2alg[1<<7] = 'a1'
+            alg2bin[name] = 1<<count
+            bin2index[1<<count] = count  # bin2index[a1] = 7
             count = count + 1
     bin2alg[0] = 0
     alg2bin[0] = 0
@@ -2363,7 +2366,7 @@ def get_direction_masks ():
     white_squares = 0
     black_squares = 0
     for i in range(64):
-        bb = 1L<<i
+        bb = 1<<i
         if ((rank[bb] + file[bb]) % 2 == 0):
             black_squares |= bb
         else:
@@ -2386,7 +2389,7 @@ def get_direction_masks ():
     return(above,below,left,right,white_squares,black_squares)
 
 def get_files ():
-    file8 = 1L<<0 | 1L<<8 | 1L<<16 | 1L<<24 | 1L<<32 | 1L<<40 | 1L<<48 | 1L<<56
+    file8 = 1<<0 | 1<<8 | 1<<16 | 1<<24 | 1<<32 | 1<<40 | 1<<48 | 1<<56
     file = {}
     file_mask = {}
     count = 0
@@ -2394,8 +2397,8 @@ def get_files ():
     file[0] = 0
     for i in range(1,9):
         for j in range(8,0,-1):
-            file[1L<<count]      = j
-            file_mask[1L<<count] = file8<<(8-j)
+            file[1<<count]      = j
+            file_mask[1<<count] = file8<<(8-j)
             count = count + 1
     return(file,file_mask)
 
@@ -2407,8 +2410,8 @@ def get_ranks ():
     rank_mask[0] = 0
     for i in range(1,9):
         for j in range(8,0,-1):
-            rank[1L<<count]      = i
-            rank_mask[1L<<count] = (255L<<8*(i-1))
+            rank[1<<count]      = i
+            rank_mask[1<<count] = (255<<8*(i-1))
             count = count + 1
     return(rank,rank_mask)
 
@@ -2428,26 +2431,26 @@ def get_attacks (square_list=None):
             current_bb = square_list[i][current_position]
             attack_table[current_bb] = {}
             # now loop over an occupation number
-            for occupation in range(1L<<list_size):
+            for occupation in range(1<<list_size):
                 moves = 0
                 # loop over the squares to the right of the mover
                 for newsquare in range(current_position+1,list_size):
                     moves |= square_list[i][newsquare]
                     # we've found a blocking piece, bail out.
-                    if ((1L<<newsquare) & occupation):
+                    if ((1<<newsquare) & occupation):
                         break
                 # loop over the squares to the left of the mover
                 for newsquare in range(current_position-1,-1,-1):
                     moves |= square_list[i][newsquare]
                     # blocking piece found, bail out.
-                    if ((1L<<newsquare) & occupation):
+                    if ((1<<newsquare) & occupation):
                         break
                 # convert occupation to a bb number
                 temp_bb = 0
                 while (occupation):
                     lowest = ((occupation) & -(occupation))
                     temp_bb |= square_list[i][bin2index[lowest]] 
-                    occupation = ((occupation) & ((occupation) - 1L))
+                    occupation = ((occupation) & ((occupation) - 1))
                 # record the possible attack moves for the
                 # current bitboard square with the given occupation
                 attack_table[current_bb][temp_bb] = moves
@@ -2693,18 +2696,18 @@ def get_diag_ne ():
     diag_mask_ne = {}
     diag_mask_ne[0] = 0
     for i in range(8):
-        diag_mask_ne[1L<<i] = 0
+        diag_mask_ne[1<<i] = 0
         for j in range(i+1):
-            diag_mask_ne[1L<<i] |= (1L<<(i+7*j))
+            diag_mask_ne[1<<i] |= (1<<(i+7*j))
         for j in range(i+1):
-            diag_mask_ne[1L<<(i+7*j)] = diag_mask_ne[1L<<i]
+            diag_mask_ne[1<<(i+7*j)] = diag_mask_ne[1<<i]
     # ne top half of the board
     for i in range(63,55,-1):
-        diag_mask_ne[1L<<i] = 0
+        diag_mask_ne[1<<i] = 0
         for j in range(64-i):
-            diag_mask_ne[1L<<i] |= (1L<<(i-7*j))
+            diag_mask_ne[1<<i] |= (1<<(i-7*j))
         for j in range(64-i):
-            diag_mask_ne[1L<<(i-7*j)] = diag_mask_ne[1L<<i]
+            diag_mask_ne[1<<(i-7*j)] = diag_mask_ne[1<<i]
     return(diag_mask_ne)
 
 def get_diag_nw ():
@@ -2712,42 +2715,42 @@ def get_diag_nw ():
     diag_mask_nw = {}
     diag_mask_nw[0] = 0
     for i in range(7,-1,-1):
-        diag_mask_nw[1L<<i] = 0
+        diag_mask_nw[1<<i] = 0
         for j in range(8-i):
-            diag_mask_nw[1L<<i] |= (1L<<(i+9*j))
+            diag_mask_nw[1<<i] |= (1<<(i+9*j))
         for j in range(8-i):
-            diag_mask_nw[1L<<(i+9*j)] = diag_mask_nw[1L<<i]
+            diag_mask_nw[1<<(i+9*j)] = diag_mask_nw[1<<i]
     # top half of the board
     for i in range(56,64):
-        diag_mask_nw[1L<<i] = 0
+        diag_mask_nw[1<<i] = 0
         for j in range(i-55):
-            diag_mask_nw[1L<<i] |= (1L<<(i-9*j))
+            diag_mask_nw[1<<i] |= (1<<(i-9*j))
         for j in range(i-55):
-            diag_mask_nw[1L<<(i-9*j)] = diag_mask_nw[1L<<i]
+            diag_mask_nw[1<<(i-9*j)] = diag_mask_nw[1<<i]
     return(diag_mask_nw)
 
 def get_knight_moves2 ():
     knight_moves = {}
     knight_moves[0] = 0
     for i in range(64):
-        index = 1L<<i
-        knight_moves[1L<<i] = 0
-        if (((i+15) < 64) and (file[1L<<(i+15)] - file[index] == 1)):
-            knight_moves[1L<<i] |= 1L<<(i+15)
-        if (((i+6) < 64) and (file[1L<<(i+6)] - file[index] == 2)):
-            knight_moves[1L<<i] |= 1L<<(i+6)
-        if (((i+10) < 64) and (file[1L<<(i+10)] - file[index] == -2)):
-            knight_moves[1L<<i] |= 1L<<(i+10)
-        if (((i+17) < 64) and (file[1L<<(i+17)] - file[index] == -1)):
-            knight_moves[1L<<i] |= 1L<<(i+17)
-        if (((i-10) > -1) and (file[1L<<(i-10)] - file[index] == 2)):
-            knight_moves[1L<<i] |= 1L<<(i-10)
-        if (((i-17) > -1) and (file[1L<<(i-17)] - file[index] == 1)):
-            knight_moves[1L<<i] |= 1L<<(i-17)
-        if (((i-15) > -1) and (file[1L<<(i-15)] - file[index] == -1)):
-            knight_moves[1L<<i] |= 1L<<(i-15)
-        if (((i-6) > -1) and (file[1L<<(i-6)] - file[index] == -2)):
-            knight_moves[1L<<i] |= 1L<<(i-6)
+        index = 1<<i
+        knight_moves[1<<i] = 0
+        if (((i+15) < 64) and (file[1<<(i+15)] - file[index] == 1)):
+            knight_moves[1<<i] |= 1<<(i+15)
+        if (((i+6) < 64) and (file[1<<(i+6)] - file[index] == 2)):
+            knight_moves[1<<i] |= 1<<(i+6)
+        if (((i+10) < 64) and (file[1<<(i+10)] - file[index] == -2)):
+            knight_moves[1<<i] |= 1<<(i+10)
+        if (((i+17) < 64) and (file[1<<(i+17)] - file[index] == -1)):
+            knight_moves[1<<i] |= 1<<(i+17)
+        if (((i-10) > -1) and (file[1<<(i-10)] - file[index] == 2)):
+            knight_moves[1<<i] |= 1<<(i-10)
+        if (((i-17) > -1) and (file[1<<(i-17)] - file[index] == 1)):
+            knight_moves[1<<i] |= 1<<(i-17)
+        if (((i-15) > -1) and (file[1<<(i-15)] - file[index] == -1)):
+            knight_moves[1<<i] |= 1<<(i-15)
+        if (((i-6) > -1) and (file[1<<(i-6)] - file[index] == -2)):
+            knight_moves[1<<i] |= 1<<(i-6)
     return(knight_moves)
 
 def get_knight_moves ():
@@ -2758,7 +2761,7 @@ def get_knight_moves ():
     # we shift it back to a8 where we will start
     knight_attacks = knight_attacks << 18
     for i in range(64):
-        square = 1L<<i
+        square = 1<<i
         # always shift down to the square we are working on
         ka = knight_attacks >> (63 - i)
         if (file[square] > 2 and file[square] < 7):
@@ -2778,24 +2781,24 @@ def get_king_moves ():
     king_moves = {}
     king_moves[0] = 0
     for i in range(64):
-        index = 1L<<i
-        king_moves[1L<<i] = 0
-        if (((i+1) < 64) and (file[1L<<(i+1)] - file[index] == -1)):
-            king_moves[1L<<i] |= 1L<<(i+1)
-        if (((i+7) < 64) and (file[1L<<(i+7)] - file[index] == 1)):
-            king_moves[1L<<i] |= 1L<<(i+7)
-        if (((i+8) < 64) and (file[1L<<(i+8)] - file[index] == 0)):
-            king_moves[1L<<i] |= 1L<<(i+8)
-        if (((i+9) < 64) and (file[1L<<(i+9)] - file[index] == -1)):
-            king_moves[1L<<i] |= 1L<<(i+9)
-        if (((i-8) > -1) and (file[1L<<(i-8)] - file[index] == 0)):
-            king_moves[1L<<i] |= 1L<<(i-8)
-        if (((i-9) > -1) and (file[1L<<(i-9)] - file[index] == 1)):
-            king_moves[1L<<i] |= 1L<<(i-9)
-        if (((i-1) > -1) and (file[1L<<(i-1)] - file[index] == 1)):
-            king_moves[1L<<i] |= 1L<<(i-1)
-        if (((i-7) > -1) and (file[1L<<(i-7)] - file[index] == -1)):
-            king_moves[1L<<i] |= 1L<<(i-7)
+        index = 1<<i
+        king_moves[1<<i] = 0
+        if (((i+1) < 64) and (file[1<<(i+1)] - file[index] == -1)):
+            king_moves[1<<i] |= 1<<(i+1)
+        if (((i+7) < 64) and (file[1<<(i+7)] - file[index] == 1)):
+            king_moves[1<<i] |= 1<<(i+7)
+        if (((i+8) < 64) and (file[1<<(i+8)] - file[index] == 0)):
+            king_moves[1<<i] |= 1<<(i+8)
+        if (((i+9) < 64) and (file[1<<(i+9)] - file[index] == -1)):
+            king_moves[1<<i] |= 1<<(i+9)
+        if (((i-8) > -1) and (file[1<<(i-8)] - file[index] == 0)):
+            king_moves[1<<i] |= 1<<(i-8)
+        if (((i-9) > -1) and (file[1<<(i-9)] - file[index] == 1)):
+            king_moves[1<<i] |= 1<<(i-9)
+        if (((i-1) > -1) and (file[1<<(i-1)] - file[index] == 1)):
+            king_moves[1<<i] |= 1<<(i-1)
+        if (((i-7) > -1) and (file[1<<(i-7)] - file[index] == -1)):
+            king_moves[1<<i] |= 1<<(i-7)
     return(king_moves)
 
 def quies(alpha, beta, position, wtm, line):
@@ -2821,14 +2824,14 @@ def quies(alpha, beta, position, wtm, line):
 
 def remember_best_move (move,position):
     hash_index = str(self.hash_index[0:64])
-    if (transition_table.has_key(hash_index)):
+    if (hash_index in transition_table):
         transition_table[hash_index]['best_move'] = move
 
     
 def probe_hash (depth, alpha, beta, position):
     hash_index = str(self.hash_index[0:64])
 
-    if (transition_table.has_key(hash_index)):
+    if (hash_index in transition_table):
         tt = transition_table[hash_index]
         if (tt['depth'] >= depth):
             if (tt['value_type'] == 'EXACT'):
@@ -2843,7 +2846,7 @@ def probe_hash (depth, alpha, beta, position):
 def record_hash (depth, value, value_type, position):
     if (len(transition_table['key_list']) > TRANSITION_TABLE_MAX_SIZE):
         first = transition_table['key_list'].pop()
-        if (transition_table.has_key(first)):
+        if (first in transition_table):
             del transition_table[first]
 
     hash_index = str(self.hash_index[0:64])
@@ -2880,10 +2883,10 @@ def negascout (depth, alpha, beta, position, wtm, pline, mate):
         if (depth == SEARCH_DEPTH):
             root_counter += 1
             if (not XBOARD):
-                print "working on %s %d/%d" % \
-                      (reg2san(m,position),root_counter,num_moves)
+                print("working on %s %d/%d" % \
+                      (reg2san(m,position),root_counter,num_moves))
             else:
-                print ".",
+                print(".", end=' ')
         #print (SEARCH_DEPTH - depth + 1) * "  ",
         #print "making move %s-%s %s %s" % (bin2alg[f],bin2alg[t],n,c)
         make_move(position,m)
@@ -2902,7 +2905,7 @@ def negascout (depth, alpha, beta, position, wtm, pline, mate):
         
         if (a >= beta):
             v,w,x,y,z = m
-            print "move = ",m
+            print("move = ",m)
             pline.insert(0,(a,bin2alg[v],bin2alg[w],x,y,z,m))
             return(a)
 
@@ -2971,8 +2974,8 @@ def alphabeta (depth, alpha, beta, position, wtm, pline,
         if (depth == STARTING_DEPTH):
             root_counter += 1
             #if (not XBOARD):
-            print "working on %s %d/%d" % (position.reg2san(m),
-                                           root_counter,num_moves)
+            print("working on %s %d/%d" % (position.reg2san(m),
+                                           root_counter,num_moves))
 
         position.make_move(m)
 
@@ -3022,7 +3025,7 @@ def position2fen (position):
     fen = ""
     empty_count = 0
     for i in range(63,-1,-1):
-        index = 1L<<i
+        index = 1<<i
         #print i,fen
         # finish off the rank
         if ((i < 63) and ((i+1) % 8) == 0):
@@ -3033,12 +3036,12 @@ def position2fen (position):
                 fen = "%s/" % (fen)
                 empty_count = 0                
         # enter a piece and put in the emptys first
-        if (piece_name.has_key(index)):
+        if (index in piece_name):
             if (empty_count):
-                fen = "%s%s%s" % (fen,empty_count,piece_name[1L<<i])
+                fen = "%s%s%s" % (fen,empty_count,piece_name[1<<i])
                 empty_count = 0
             else:
-                fen = "%s%s" % (fen,piece_name[1L<<i])
+                fen = "%s%s" % (fen,piece_name[1<<i])
         else:
             empty_count += 1
 
@@ -3192,20 +3195,20 @@ def generate_piece_square_values ():
                   0, 0, 1, 2, 2, 1, 0, 0]
 
     for i in range(64):
-        piece_square_value['P'][1L<<i] = wp[63-i]
-        piece_square_value['p'][1L<<i] = bp[63-i]
-        piece_square_value['N'][1L<<i] = wn[63-i]
-        piece_square_value['n'][1L<<i] = bn[63-i]
-        piece_square_value['B'][1L<<i] = wb[63-i]
-        piece_square_value['b'][1L<<i] = bb[63-i]
-        piece_square_value['R'][1L<<i] = wr[63-i]
-        piece_square_value['r'][1L<<i] = br[63-i]
-        piece_square_value['Q'][1L<<i] = wq[63-i]
-        piece_square_value['q'][1L<<i] = bq[63-i]
-        piece_square_value['K'][1L<<i] = wk[63-i]
-        piece_square_value['k'][1L<<i] = bk[63-i]
-        piece_square_value['K_endgame'][1L<<i] = wk_endgame[63-i]
-        piece_square_value['k_endgame'][1L<<i] = bk_endgame[63-i]
+        piece_square_value['P'][1<<i] = wp[63-i]
+        piece_square_value['p'][1<<i] = bp[63-i]
+        piece_square_value['N'][1<<i] = wn[63-i]
+        piece_square_value['n'][1<<i] = bn[63-i]
+        piece_square_value['B'][1<<i] = wb[63-i]
+        piece_square_value['b'][1<<i] = bb[63-i]
+        piece_square_value['R'][1<<i] = wr[63-i]
+        piece_square_value['r'][1<<i] = br[63-i]
+        piece_square_value['Q'][1<<i] = wq[63-i]
+        piece_square_value['q'][1<<i] = bq[63-i]
+        piece_square_value['K'][1<<i] = wk[63-i]
+        piece_square_value['k'][1<<i] = bk[63-i]
+        piece_square_value['K_endgame'][1<<i] = wk_endgame[63-i]
+        piece_square_value['k_endgame'][1<<i] = bk_endgame[63-i]
 
     return(piece_square_value)
 
@@ -3216,14 +3219,14 @@ def generate_book (book_filename=None,binbook_filename=None,max_moves=19):
     The hash table is then read into memory and used directly.
     """
     if (not book_filename or not binbook_filename):
-        print "Error: missing book filename"
+        print("Error: missing book filename")
     try:
         fd = open(book_filename)
         fd.close()
     except:
-        print "Error reading",book_filename
+        print("Error reading",book_filename)
         return
-    print "\nGenerating book moves from",book_filename,
+    print("\nGenerating book moves from",book_filename, end=' ')
     illegal_moves = 0
     game_count = 0
     move_count = 0
@@ -3237,7 +3240,7 @@ def generate_book (book_filename=None,binbook_filename=None,max_moves=19):
         line_count += 1
         if (line.find("White") == 1 or line.find("ECO") == 1):
 
-            print "game=%s line=%s" % (game_count,line_count)    
+            print("game=%s line=%s" % (game_count,line_count))
 
             position = get_fen_position(INIT_FEN)
             game_count += 1
@@ -3247,9 +3250,9 @@ def generate_book (book_filename=None,binbook_filename=None,max_moves=19):
         if (line_count % 5000 == 0):
             # dump the book every 5000 lines
             bd = open(binbook_filename,"w")
-            cPickle.dump(book,bd)
+            pickle.dump(book,bd)
             bd.close()
-            print "dumped opening book"
+            print("dumped opening book")
 
         if (line and line[0] != '['):
             moves = line.split()
@@ -3271,7 +3274,7 @@ def generate_book (book_filename=None,binbook_filename=None,max_moves=19):
                         move = move[0:index+1]
 
                     # make the move
-                    if (not ignore_restofgame and legal_moves.has_key(move)):
+                    if (not ignore_restofgame and move in legal_moves):
                         if (not promoted_piece):
                             bmove = legal_moves[move]
 
@@ -3288,7 +3291,7 @@ def generate_book (book_filename=None,binbook_filename=None,max_moves=19):
                             ignore_restofgame = 1
                         fen = position2fen(position)
                         book_index = "%s:%s" % (fen,wtm) 
-                        if (book.has_key(book_index)):
+                        if (book_index in book):
                             # before adding the move make sure it's unique
                             if (move in book[book_index]):
                                 pass
@@ -3304,31 +3307,31 @@ def generate_book (book_filename=None,binbook_filename=None,max_moves=19):
                         #print "Game Over",line_count
                     elif (not ignore_restofgame):
                         display(position)
-                        print "Invalid move",move
-                        print "line",line_count
+                        print("Invalid move",move)
+                        print("line",line_count)
 
                         illegal_moves += 1
                         # might as well save what we have so far
                         bd = open(binbook_filename,"w")
-                        cPickle.dump(book,bd)
+                        pickle.dump(book,bd)
                         bd.close()
                         sys.exit()
                 else:
                     pass
 
-    print "\ngenerate_book: pgn file %s games=%s legal_moves=%s illegal_moves=%s lines=%s" % \
-          (book_filename,game_count,move_count,illegal_moves,line_count)
+    print("\ngenerate_book: pgn file %s games=%s legal_moves=%s illegal_moves=%s lines=%s" % \
+          (book_filename,game_count,move_count,illegal_moves,line_count))
 
     bd = open(binbook_filename,"w")
-    cPickle.dump(book,bd)
+    pickle.dump(book,bd)
     bd.close()
     return
 
 def analyze_game (game_filename=None,max_moves=10000):
     if (not game_filename):
-        print "Error: missing game filename"
+        print("Error: missing game filename")
         return
-    print "\nAnalyzing game",game_filename,
+    print("\nAnalyzing game",game_filename, end=' ')
     illegal_moves = 0
     game_count = 0
     move_count = 0
@@ -3342,7 +3345,7 @@ def analyze_game (game_filename=None,max_moves=10000):
         line_count += 1
 
         if (line.find("White") == 1 or line.find("ECO") == 1):
-            print "game=%s line=%s" % (game_count,line_count)     #"."
+            print("game=%s line=%s" % (game_count,line_count)) #"."
 
             position = get_fen_position(INIT_FEN)
             game_count += 1
@@ -3359,8 +3362,8 @@ def analyze_game (game_filename=None,max_moves=10000):
                     wtm ^= 1
                     c,nc = generate_moves(position,wtm)
                     legal_moves = get_move_list(c + nc,position)
-                    print "legal moves",display_moves(c+nc)
-                    print "san moves", get_move_list(c+nc,position)
+                    print("legal moves",display_moves(c+nc))
+                    print("san moves", get_move_list(c+nc,position))
                     # strip off the + or ++ for check and checkmate
                     if (move.find('+') > -1):
                         index = move.find("+")
@@ -3371,7 +3374,7 @@ def analyze_game (game_filename=None,max_moves=10000):
                         move = move[0:index+1]
                         # we need to insert the promoted piece into
                         # the legal move
-                    if (not ignore_restofgame and legal_moves.has_key(move)):
+                    if (not ignore_restofgame and move in legal_moves):
                         if (not promoted_piece):
                             bmove = legal_moves[move]
                         else:
@@ -3393,25 +3396,25 @@ def analyze_game (game_filename=None,max_moves=10000):
 
                     elif (not ignore_restofgame):
                         display(position)
-                        print "Invalid move",move
-                        print "line",line_count
+                        print("Invalid move",move)
+                        print("line",line_count)
                         illegal_moves += 1
                         # might as well save what we have so far
                         sys.exit()
                 else:
                     pass
                     #print "move number ",move
-    print "\nanalyze_game: pgn file %s games=%s legal_moves=%s illegal_moves=%s lines=%s" % \
-          (game_filename,game_count,move_count,illegal_moves,line_count)
+    print("\nanalyze_game: pgn file %s games=%s legal_moves=%s illegal_moves=%s lines=%s" % \
+          (game_filename,game_count,move_count,illegal_moves,line_count))
     #bindex = book.keys()
     return
 
 def search_simple (position, wtm):
     move_list = position.generate_moves(wtm)
     moves,san_moves = position.get_move_list(move_list)
-    print move_list
-    print moves
-    print san_moves
+    print(move_list)
+    print(moves)
+    print(san_moves)
     if (len(move_list) > 0):
         return(san_moves[move_list[0]])
     else:
@@ -3439,15 +3442,15 @@ def search_alphabeta (position,wtm):
             regular_move = ""
         else:
             if (not XBOARD):
-                print "Best moves:",
+                print("Best moves:", end=' ')
                 for m in best_moves:
-                    print "%s " % (position.reg2san(m)),
-                print
+                    print("%s " % (position.reg2san(m)), end=' ')
+                print()
 
-                print "Best variation:", 
+                print("Best variation:", end=' ')
                 for m in line["moves"]:
-                    print m, 
-                print
+                    print(m, end=' ')
+                print()
             regular_move = "%s%s" % (bin2alg[best_moves[0].from_square],
                                      bin2alg[best_moves[0].to_square])
             # at this point, we save the best moves for the next depth
@@ -3458,9 +3461,9 @@ def search_alphabeta (position,wtm):
             return(regular_move)
         
         #if (not XBOARD):
-        print "depth=%s move=%s value=%s nps=%d total nodes=%s time=%6.2f" % \
+        print("depth=%s move=%s value=%s nps=%d total nodes=%s time=%6.2f" % \
               (depth,regular_move,val,counters['nodes']/(end-start),
-               counters['nodes'],end-start)
+               counters['nodes'],end-start))
 
     return(regular_move)
 
@@ -3481,9 +3484,9 @@ def search_negascout (position,wtm):
             v,f,t,n,c,p,m = line[0]
             regular_move = "%s%s" % (f,t)
             remember_best_move(m,position)
-        print "depth=%s move=%s value=%s nps=%d total nodes=%s time=%6.2f" % \
+        print("depth=%s move=%s value=%s nps=%d total nodes=%s time=%6.2f" % \
               (depth,regular_move,val,counters['nodes']/(end-start),
-               counters['nodes'],end-start)
+               counters['nodes'],end-start))
 
     return(regular_move)
 
@@ -3492,13 +3495,13 @@ def check_end_of_game (position,moves):
         moves = None
 
     if (moves == None and not position.in_check):
-        print "1/2-1/2 {Stalemate}"
+        print("1/2-1/2 {Stalemate}")
         return(1)
     if (moves == None and position.in_check):
         if (position.side_in_check): # computer is white
-            print "0-1 {Black mates}"
+            print("0-1 {Black mates}")
         else:
-            print "1-0 {White mates}"
+            print("1-0 {White mates}")
         #print "Game over.  Winner is",position.winner
         return(1)
 
@@ -3508,13 +3511,13 @@ def print_move_list (position):
     # list makes a copy because we don't want
     # to change the actual history.
     history = list(position.move_history)
-    print "\nGame Record\n====================="
+    print("\nGame Record\n=====================")
     if (len(history) % 2 != 0):
         history.append(("",""))
 
     counter = 1
     for i in range(0,len(history),2):
-        print "%s. %s\t\t%s" % (counter,history[i][0],history[i+1][0])
+        print("%s. %s\t\t%s" % (counter,history[i][0],history[i+1][0]))
         counter += 1
     return
 
@@ -3534,14 +3537,14 @@ def let_computer_move (position,computer_color):
     
     fen = position2fen(position)
     bindex = "%s:%s" % (fen,computer_color)
-    if (book.has_key(bindex)):
+    if (bindex in book):
         random_index = random.randint(0,len(book[bindex])-1)
         book_move = book[bindex][random_index]
         move = moves[book_move]
         regular_move = "%s%s" % (bin2alg[move.from_square],bin2alg[move.to_square])
 
         if (not XBOARD):
-            print "found book move"
+            print("found book move")
     else:
         if (len(moves) == 1):
             # there is only one move...just make it
@@ -3554,34 +3557,34 @@ def let_computer_move (position,computer_color):
         if (check_end_of_game(position,regular_move)):
             return(position)
 
-        if (moves.has_key(regular_move)):
+        if (regular_move in moves):
             move = moves[regular_move]
         else:
-            print "invalid computer move",regular_move
+            print("invalid computer move",regular_move)
             return(position)
 
-    print "move %s" % \
-          (san_moves[regular_move]) 
+    print("move %s" % \
+          (san_moves[regular_move]))
     position.move_history.append((san_moves[regular_move],move))
 
     position.make_move(move)
     position.move_count += 1
     if (not XBOARD):
-        print position
+        print(position)
 
     return(position)
 
 def print_help ():
-    print "Shatranj version",VERSION
-    print "       go or pass: switch sides      m: show legal moves" 
-    print "                n: new game          l: list game record"
-    print "                d: display board     k: show book moves"  
-    print "           sd <n>: search depth <n>  b: take back last move"
-    print "                e: show current position evaluation value"
-    print "           remove: take back last two moves"
-    print " resign or result: resign and end the game"
-    print "              fen: show the current board postion in FEN notation"
-    print "           v or h: help              q: quit"
+    print("Shatranj version",VERSION)
+    print("       go or pass: switch sides      m: show legal moves")
+    print("                n: new game          l: list game record")
+    print("                d: display board     k: show book moves")
+    print("           sd <n>: search depth <n>  b: take back last move")
+    print("                e: show current position evaluation value")
+    print("           remove: take back last two moves")
+    print(" resign or result: resign and end the game")
+    print("              fen: show the current board postion in FEN notation")
+    print("           v or h: help              q: quit")
     return
 
 def play ():
@@ -3595,12 +3598,12 @@ def play ():
     if(not XBOARD):
         print_help()
     else:
-        print 'feature myname="Shatranj',VERSION,'"'
-        print "feature ping=1"
-        print "feature san=1"
-        print "feature time=0"
-        print "feature done=1"
-        print "ok"
+        print('feature myname="Shatranj',VERSION,'"')
+        print("feature ping=1")
+        print("feature san=1")
+        print("feature time=0")
+        print("feature done=1")
+        print("ok")
 
     computer_color = 0
     while (command != "quit"):
@@ -3608,32 +3611,32 @@ def play ():
         moves,san_moves = position.get_move_list(move_list)
 
         if (check_end_of_game(position,moves)):
-            print_move_list(position)
+            print(_move_list(position))
             position = reset_game()
 
         if (not XBOARD):
-            print "\nShatranj (%s to move):" % (mover[computer_color^1]),
+            print("\nShatranj (%s to move):" % (mover[computer_color^1]),)
         try:
-            command = raw_input()
+            command = input()
         except EOFError:
             goodbye("EOFError")
         except IOError:
-            print "got IOError"
+            print("got IOError")
             continue
         if (len(command) == 1 and command[0:1] == "d"):
-            print position
+            print(position)
         elif (len(command) == 1 and command[0:1] == "k"):
             fen = position2fen(position)
             bindex = "%s:%s" % (fen,computer_color^1)
-            if (book.has_key(bindex)):
+            if (bindex in book):
                 book_moves = book[bindex]
                 book_moves.sort()
-                print "book moves:",
+                print("book moves:",)
                 for i in book_moves:
-                    print i,
-                print
+                    print(i,)
+                print()
             else:
-                print "Sorry, no book moves available."
+                print("Sorry, no book moves available.")
 
         # help
         elif (len(command) == 1 and command[0:1] == "h"):
@@ -3646,20 +3649,20 @@ def play ():
         elif (len(command) == 1 and command[0:1] == "b"):
 
             if (len(position.move_history) < 1):
-                print "no moves to take back"
+                print("no moves to take back")
             else:
                 san_move,move = position.move_history.pop()
                 position.unmake_move(move)
                 position.move_count -= 1
-                print "took back %s" % (san_move)
-                print position
+                print("took back %s" % (san_move))
+                print(position)
                 computer_color ^= 1
 
         # take back last two moves
         elif (command[0:6] == "remove"):
 
             if (len(position.move_history) < 2):
-                print "no moves to take back"
+                print("no moves to take back")
             else:
                 san_move,move = position.move_history.pop()
                 position.unmake_move(move)
@@ -3667,32 +3670,32 @@ def play ():
                 san_move,move = position.move_history.pop()
                 position.unmake_move(move)
                 position.move_count -= 1
-                print "ok"
+                print("ok")
                 
         elif (command[0:4] == "ping"):
-            print "pong %s" % (command[5:])
+            print("pong %s" % (command[5:]))
 
         # Go or Pass: force the computer to play the move
         elif (command[0:2] == "go" or command[:4] == "pass"):
             computer_color ^= 1
-            print "ok"
+            print("ok")
             force = 0
             position = let_computer_move(position,computer_color)
 
         elif (command[0:5] == "force"):
-            print "ok"
+            print("ok")
             force = 1
 
         elif (command[0:6] == "xboard"):
             XBOARD = 1
-            print 'feature myname="Shatranj',VERSION,'"'
-            print "feature ping=1"
-            print "feature san=1"
-            print "feature time=0"
-            print "feature done=1"
-            print "feature colors=0"
-            print "feature playother=1"
-            print "ok"
+            print('feature myname="Shatranj',VERSION,'"')
+            print("feature ping=1")
+            print("feature san=1")
+            print("feature time=0")
+            print("feature done=1")
+            print("feature colors=0")
+            print("feature playother=1")
+            print("ok")
             
         elif (command[0:8] == "protover" or command[0:8] == "computer" or \
               command[0:6] == "random" or \
@@ -3700,8 +3703,8 @@ def play ():
               command[0:5] == "level" or command[0:4] == "hard" or \
               command[0:8] == "accepted" or command[0:4] == "easy" or \
               command[0:5] == "white" or command[0:5] == "black"): 
-            print "debug: got ",command
-            print "ok"
+            print("debug: got ",command)
+            print("ok")
 
         # resign game
         elif (command[0:6] == "result" or command[0:6] == "resign"):
@@ -3715,36 +3718,36 @@ def play ():
         # start new game
         elif (command[0:1] == "n"):
             position = reset_game()
-            print "ok"
+            print("ok")
             
         elif (command[0:2] == "st"):
-            print "ok"
+            print("ok")
 
         # change the search depth
         elif (command[0:2] == "sd"):
             temp = command.split(" ")
             if (len(temp) != 2):
-                print "Invalid search depth: currently set to",SEARCH_DEPTH
+                print("Invalid search depth: currently set to",SEARCH_DEPTH)
             else:
                 sd = temp[1]
                 SEARCH_DEPTH = int(sd)
-                print "sd = %s" % SEARCH_DEPTH
+                print("sd = %s" % SEARCH_DEPTH)
 
         # list the move history
         elif (command[0:1] == "l"):
-            print_move_list(position)
+            print(_move_list(position))
             
         # show possible moves
         elif (command[0:1] == "m"):
-            print "\nlegal moves:",
+            print("\nlegal moves:",)
             move_list = san_moves.values()
             move_list.sort()
             for i in move_list:
-                print i,
+                print(i,)
 
         # show static evaluation
         elif (len(command) == 1 and command[0:1] == "e"):
-            print "\nBoard evaluation: ",position.eval(computer_color,0)
+            print("\nBoard evaluation: ",position.eval(computer_color,0))
 
         elif (command[:8] == "setboard"):
             try:
@@ -3752,10 +3755,10 @@ def play ():
                 computer_color=0
                 counters['nodes'] = 0
             except:
-                print "Invalid setboard command: usage is setboard <fen position>"
+                print("Invalid setboard command: usage is setboard <fen position>")
        
         elif (command[:3]=="fen"):
-            print "FEN Position: ",position2fen(position)
+            print("FEN Position: ",position2fen(position))
 
         # quit the game
         elif (command[0:1] == "q"):
@@ -3767,18 +3770,18 @@ def play ():
             # we need to add the promoted piece to the move.
             if (command.find("=") > 0):
                 index = command.find("=")
-                print "promotion move..",command
+                print("promotion move..",command)
                 try:
                     promoted_piece = command[index+1:index+2]
                 except:
-                    print "Warning: in the future, please specify promotion piece (i.e. f8=Q)"
-                    print "         Defaulting to promoting pawn to queen."
+                    print("Warning: in the future, please specify promotion piece (i.e. f8=Q)")
+                    print("         Defaulting to promoting pawn to queen.")
                     promoted_piece = ""
                 command = command[0:index+1]
                 # we need to insert the promoted piece into
                 # the legal move
-                print "  new move=%s promoted_piece=%s" % \
-                      (command,promoted_piece)
+                print("  new move=%s promoted_piece=%s" % \
+                      (command,promoted_piece))
 
             # some moves have a check sign (+ for check or ++ for mate) so we need to remove it first
             if (command.find("+") > 0):
@@ -3791,7 +3794,7 @@ def play ():
                 command = command[0:index]
             
 
-            if (moves.has_key(command)):
+            if (command in moves):
                 line = []
                 m = moves[command]
                 regular_move = "%s%s" % (bin2alg[m.from_square],bin2alg[m.to_square])
@@ -3814,35 +3817,35 @@ def play ():
                 else:
                     computer_color ^= 1
             else:
-                print "Illegal move:",command
-                print "legal moves:",
+                print("Illegal move:",command)
+                print("legal moves:",)
                 move_list = san_moves.values()
                 move_list.sort()
                 for i in move_list:
-                    print i,
+                    print(i,)
 
     return
 
 def goodbye (message=""):
-    print "\nGoodbye with message %s\n" % message
+    print("\nGoodbye with message %s\n" % message)
     sys.exit()
     return
 
 def gotSIGINT (signum,frame):
     #print "\nGoodbye\n"
     #sys.exit()
-    print "gotSIGINT: got signum %s with frame %s" % (signum, frame)
+    print("gotSIGINT: got signum %s with frame %s" % (signum, frame))
     return
 
 def gotSIGTERM (signum,frame):
     #print "\nGoodbye\n"
-    print "gotSIGTERM: got signum %s with frame %s" % (signum, frame)
+    print("gotSIGTERM: got signum %s with frame %s" % (signum, frame))
     sys.exit()
     return
 
 def gotSIGHUP (signum,frame):
     #print "\nGoodbye\n"
-    print "gotSIGHUP: got signum %s with frame %s" % (signum, frame)
+    print("gotSIGHUP: got signum %s with frame %s" % (signum, frame))
     #sys.exit()
     return
 
@@ -3852,16 +3855,16 @@ def gotSIGHUP (signum,frame):
 def test_init ():
     global tests_passed, tests_failed, test_number
     p = Position()
-    print "1. test: initialization"
+    print("1. test: initialization")
     bb = p.piece_bb
     if ((bb['k'] == e8) and (bb['q'] == d8) and (bb['b'] == (c8|f8)) and \
         (bb['n'] == (b8|g8)) and (bb['r'] == (a8|h8)) and (bb['p'] == (255<<48)) and \
         (bb['K'] == e1) and (bb['Q'] == d1) and (bb['B'] == (c1|f1)) and \
         (bb['N'] == (b1|g1)) and (bb['R'] == (a1|h1)) and (bb['P'] == (255<<8))):  
-        print "    1.1 pieces in correct place: PASSED"
+        print("    1.1 pieces in correct place: PASSED")
         tests_passed += 1
     else:
-        print "    1.1 pieces in correct place: FAILED"
+        print("    1.1 pieces in correct place: FAILED")
         tests_failed += 1
     return
 
@@ -3872,14 +3875,14 @@ def test_checkmate ():
     wtm = 1
     fen = "1k6/pp3R2/6pp/4p3/2B3b1/4Q3/PPP2B2/3rK3"
     p = Position(fen)
-    print p
+    print(p)
     m =  search_alphabeta(p,wtm)
-    print "6. test: checkmate"
+    print("6. test: checkmate")
     if (m == '' and p.winner == "black"):
-        print "    6.1 checkmate test black checkmate: PASSED"
+        print("    6.1 checkmate test black checkmate: PASSED")
         tests_passed += 1
     else:
-        print "    6.1 checkmate test black checkmate: FAILED"
+        print("    6.1 checkmate test black checkmate: FAILED")
         tests_failed += 1
 
 def test_pinned ():
@@ -3897,24 +3900,24 @@ def test_pinned ():
     p.w_rook_h1_location = f1
     p.b_rook_a8_location = c2
     p.b_rook_h8_location = e8
-    print "5. test: pinned piece check"
+    print("5. test: pinned piece check")
     #print p
     p.generate_attacks()
     mask = p.pinned(g2,1)
     move_list = p.generate_moves(1)
     moves,san_moves = p.get_move_list(move_list)
     if (mask == (255<<8)):
-        print "    5.1 pinned g2 pawn mask correct: PASSED"
+        print("    5.1 pinned g2 pawn mask correct: PASSED")
         tests_passed += 1
     else:
-        print "    5.1 pinned g2 pawn mask not correct: FAILED"
+        print("    5.1 pinned g2 pawn mask not correct: FAILED")
         tests_failed += 1
  
     if (san_moves.values() == ['Qf4', 'Rf4', 'Qg3', 'Kg1', 'Kh1']):
-        print "    5.2 king in check moves correct: PASSED"
+        print("    5.2 king in check moves correct: PASSED")
         tests_passed += 1
     else:
-        print "    5.2 king in check moves not correct: FAILED"
+        print("    5.2 king in check moves not correct: FAILED")
         tests_failed += 1
 
     p = Position("rnbqk2r/ppp2ppp/4p3/8/6n1/6P1/PbPQ1PBP/RNBK2NR")
@@ -3926,10 +3929,10 @@ def test_pinned ():
                      'Qd3', 'Qd4', 'Qd5', 'Qd6', 'Qd7', 'Qxd8',
                      'a3', 'a4', 'c3', 'c4', 'f3', 'f4', 'h3', 'h4']
     if (moves == correct_moves):
-        print "    5.3 Queen d2 pinned moves correct: PASSED"
+        print("    5.3 Queen d2 pinned moves correct: PASSED")
         tests_passed += 1
     else:
-        print "    5.3 Queen d2 pinned moves not correct: FAILED"
+        print("    5.3 Queen d2 pinned moves not correct: FAILED")
         tests_failed += 1
 
 def test_alphabeta (game_file=None):
@@ -3940,8 +3943,8 @@ def test_alphabeta (game_file=None):
     for line in lines:
         t = line.split()
         #print "fen=%s" % t[0]
-        print 40*"#","\nmover=%s correct move=%s" % \
-              (t[1],t[5])
+        print(40*"#","\nmover=%s correct move=%s" % \
+              (t[1],t[5]))
         fen = t[0]
         correct_move = t[5]
         if (t[1] == "b"):
@@ -3963,43 +3966,43 @@ def test_alphabeta (game_file=None):
         line = []
         val = alphabeta(SEARCH_DEPTH,-INFINITY,INFINITY,position,wtm,line,MATE)
         end = time.time()
-        print "value=%s nps=%d total nodes=%s time=%6.2f" % \
-              (val,counters['nodes']/(end-start),counters['nodes'],end-start)
+        print("value=%s nps=%d total nodes=%s time=%6.2f" % \
+              (val,counters['nodes']/(end-start),counters['nodes'],end-start))
         if (len(line) == 0):
-            print "no move found"
+            print("no move found")
             continue
         else:
             v,f,t,n,c,p = line[0]
 
             move = "%s%s" % (f,t)        
-            if (moves.has_key(move)):
+            if (move in moves):
                 move = moves[move]
             else:
-                print "invalid computer move",move
+                print("invalid computer move",move)
                 continue
-            print "computer move %s  best move %s" % \
-                  (reg2san(move,position),correct_move)
+            print("computer move %s  best move %s" % \
+                  (reg2san(move,position),correct_move))
 
 def test_generate_moves ():
     global tests_passed, tests_failed, test_number  
     fen = "2q1r1k1/1ppb4/r2p1Pp1/p4n1p/2P1n3/5NPP/PP3Q1K/2BRRB2"
     p = Position(fen)
-    print p
+    print(p)
     move_list = p.generate_moves(wtm=1)
     moves,san_moves = p.get_move_list(move_list)
     san = san_moves.values()
     san.sort()
-    print "7. test: move generation"
+    print("7. test: move generation")
     if (san == ['Bd2', 'Bd3', 'Be2', 'Be3', 'Bf4', 'Bg2', 'Bg5',
                 'Bh6', 'Kg1', 'Kg2', 'Kh1', 'Nd2', 'Nd4', 'Ne5',
                 'Ng1', 'Ng5', 'Nh4', 'Qa7', 'Qb6', 'Qc2', 'Qc5',
                 'Qd2', 'Qd4', 'Qe2', 'Qe3', 'Qg1', 'Qg2', 'Rd2',
                 'Rd3', 'Rd4', 'Rd5', 'Re2', 'Re3', 'Rxd6', 'Rxe4',
                 'a3', 'a4', 'b3', 'b4', 'c5', 'f7', 'g4', 'h4']):
-        print "    7.1 white move generation test: PASSED"
+        print("    7.1 white move generation test: PASSED")
         tests_passed += 1
     else:
-        print "    7.1 white move generation test: FAILED"
+        print("    7.1 white move generation test: FAILED")
         tests_failed += 1
 
     move_list = p.generate_moves(wtm=0)
@@ -4012,29 +4015,29 @@ def test_generate_moves ():
                 'Nxf6', 'Qa8', 'Qb8', 'Qd8', 'Ra7', 'Ra8', 'Rb6',
                 'Rc6', 'Rd8', 'Re5', 'Re6', 'Re7', 'Rf8', 'a4', 'b5',
                 'b6', 'c5', 'c6', 'd5', 'g5', 'h4']):
-        print "    7.2 black move generation test: PASSED"
+        print("    7.2 black move generation test: PASSED")
         tests_passed += 1
     else:
-        print "    7.2 black move generation test: FAILED"
+        print("    7.2 black move generation test: FAILED")
         tests_failed += 1
 
     p = Position("r3r1k1/p1p2ppp/7q/3p4/4b3/4P1PK/PP5P/R1B1Q1R1")
-    print p
+    print(p)
     san = p.show_moves(1)
     san.sort()
-    print "7. test: pawn move generation"
+    print("7. test: pawn move generation")
     if (san == ['Kg4']):
-        print "    7.3 pawn move generation test: PASSED"
+        print("    7.3 pawn move generation test: PASSED")
         tests_passed += 1
     else:
-        print "    7.3 pawn move generation test: FAILED"
+        print("    7.3 pawn move generation test: FAILED")
         tests_failed += 1
 
 
 def test_repetition ():
     global tests_passed, tests_failed, test_number
     p = Position()
-    print "4. test: repetition check"
+    print("4. test: repetition check")
     p.make_move(Move(b1,c3,"","",""))
     p.make_move(Move(b8,c6,"","",""))
     p.make_move(Move(g1,f3,"","",""))
@@ -4042,12 +4045,12 @@ def test_repetition ():
 
     hash_index = str(p.hash_index[:64])
     current_array = p.position_counter_array_list[-1]
-    if (current_array.has_key(hash_index) and \
+    if (hash_index in current_array and \
         current_array[hash_index] == 1):
-        print "    4.1 repetition check a: PASSED"
+        print("    4.1 repetition check a: PASSED")
         tests_passed += 1
     else:
-        print "    4.1 repetition check a: FAILED"
+        print("    4.1 repetition check a: FAILED")
         tests_failed += 1
 
     p.make_move(Move(c3,b1,"","",""))
@@ -4055,12 +4058,12 @@ def test_repetition ():
     hash_index = str(p.hash_index[:64])
     current_array = p.position_counter_array_list[-1]
 
-    if (current_array.has_key(hash_index) and \
+    if (hash_index in current_array and \
         current_array[hash_index] == 2):
-        print "    4.2 repetition check b: PASSED"
+        print("    4.2 repetition check b: PASSED")
         tests_passed += 1
     else:
-        print "    4.2 repetition check b: FAILED"
+        print("    4.2 repetition check b: FAILED")
         tests_failed += 1
  
 def test_generate_attacks ():
@@ -4068,32 +4071,32 @@ def test_generate_attacks ():
     
     fen = "Rr2k2r/2NP2P1/r3R3/Pp3PpB/1pPpn3/5NPP/PP1B1Qp1/RB2KN1R"
     p = Position(fen)
-    print p
+    print(p)
     p.b_pawn_last_double_move = b5
     p.generate_attacks()
     display(p.attacks_to[b5])
     display(p.attacks_to[e8])
     display(p.attacks_from[d2])
-    print "3. test: generating attacks"
+    print("3. test: generating attacks")
     if (p.attacks_to[b5] == (a5|c4|c7|b8)):
-        print "    3.1 attacks to b5: PASSED"
+        print("    3.1 attacks to b5: PASSED")
         tests_passed += 1
     else:
-        print "    3.1 attacks to b5: FAILED"
+        print("    3.1 attacks to b5: FAILED")
         tests_failed += 1
 
     if (p.attacks_to[e8] == (b8|c7|d7|e6|h5|h8)):
-        print "    3.2 attacks to e8: PASSED"
+        print("    3.2 attacks to e8: PASSED")
         tests_passed += 1
     else:
-        print "    3.2 attacks to e8: FAILED"
+        print("    3.2 attacks to e8: FAILED")
         tests_failed += 1
 
     if (p.attacks_from[d2] == (c1|c3|b4|e1|e3|f4|g5)):
-        print "    3.3 attacks from d2: PASSED"
+        print("    3.3 attacks from d2: PASSED")
         tests_passed += 1
     else:
-        print "    3.3 attacks from d2: FAILED"
+        print("    3.3 attacks from d2: FAILED")
         tests_failed += 1
 
 def test_search ():
@@ -4112,38 +4115,38 @@ def test_search ():
     p.b_rook_a8_location = b8
     p.b_rook_h8_location = f8
     move =  search_alphabeta(p,1)
-    print "2. test: alphabeta search"
+    print("2. test: alphabeta search")
     if (move == 'e1c1'):
-        print "    2.1 alphabeta search: PASSED"
+        print("    2.1 alphabeta search: PASSED")
         tests_passed += 1
     else:
-        print "    2.1 alphabeta search: FAILED"
+        print("    2.1 alphabeta search: FAILED")
         tests_failed += 1
 
 def test_castling ():
     global SEARCH_DEPTH
     global tests_passed, tests_failed, test_number
     p = Position("1rb2rk1/6p1/1pqn1pBp/3p4/5Q2/1NP3PP/8/R3K2R")
-    print p
-    print "8. test: castling"
+    print(p)
+    print("8. test: castling")
     move_list = p.generate_moves(wtm=1)
     moves,san_moves = p.get_move_list(move_list)
     san = san_moves.values()
     
     if ('O-O' in san and 'O-O-O' in san):
-        print "    8.1 castling moves: PASSED"
+        print("    8.1 castling moves: PASSED")
         tests_passed += 1
     else:
-        print "    8.1 castling moves: FAILED"
+        print("    8.1 castling moves: FAILED")
         tests_failed += 1
 
     move = moves['O-O']
     p.make_move(move)
     if (p.piece_name[f1] == 'R' and p.piece_name[g1] == 'K'):
-        print "    8.2 castling king side: PASSED"
+        print("    8.2 castling king side: PASSED")
         tests_passed += 1
     else:
-        print "    8.2 castling king side: FAILED"
+        print("    8.2 castling king side: FAILED")
         tests_failed += 1
 
     p.unmake_move(move)
@@ -4151,10 +4154,10 @@ def test_castling ():
     move = moves['O-O-O']
     p.make_move(move)
     if (p.piece_name[d1] == 'R' and p.piece_name[c1] == 'K' and p.piece_name[h1] == 'R'):
-        print "    8.3 castling queen side: PASSED"
+        print("    8.3 castling queen side: PASSED")
         tests_passed += 1
     else:
-        print "    8.3 castling queen side: FAILED"
+        print("    8.3 castling queen side: FAILED")
         tests_failed += 1
 
 def test_check ():
@@ -4175,26 +4178,26 @@ def test_check ():
     p.b_rook_a8_location = a8
     p.b_rook_h8_location = h8
     p.in_check = 1
-    print p
+    print(p)
     m =  search_alphabeta(p,wtm)
-    print "9. test: check"
-    print "m=",m
+    print("9. test: check")
+    print("m=",m)
     if (m == 'h8f8'):
-        print "    9.1 check test black checkmate: PASSED"
+        print("    9.1 check test black checkmate: PASSED")
         tests_passed += 1
     else:
-        print "    9.1 check test black checkmate: FAILED"
+        print("    9.1 check test black checkmate: FAILED")
         tests_failed += 1
     # check to make sure we can get out of check by capturing
     # and promoting a pawn.
     p =  Position("8/2p1kp1p/2p3p1/8/8/6P1/3p3P/4R2K")
     m = p.show_moves(0)
-    print m
+    print(m)
     if ('dxe1=' in m):
-        print "    9.2 In check promotion capture test: PASSED"
+        print("    9.2 In check promotion capture test: PASSED")
         tests_passed += 1
     else:
-        print "    9.2 :In check promotion capture test: FAILED"
+        print("    9.2 :In check promotion capture test: FAILED")
         tests_failed += 1
         
 
@@ -4215,17 +4218,17 @@ def test_checkmated ():
     p.w_rook_h1_location = f8
     p.b_rook_a8_location = a8
     p.b_rook_h8_location = h8
-    print "10. test: draw"
+    print("10. test: draw")
     #print p
     #print "moves are ",p.show_moves(1)
     #p = let_computer_move(p,wtm)
     m =  search_alphabeta(p,wtm)
     #print "m=",m
     if (m == 'a2b1'):
-        print "    10.1 draw test: PASSED"
+        print("    10.1 draw test: PASSED")
         tests_passed += 1
     else:
-        print "    10.1 draw test: FAILED"
+        print("    10.1 draw test: FAILED")
         tests_failed += 1
 
     fen = "8/8/8/4k3/8/4qpK1/8/8"
@@ -4241,17 +4244,17 @@ def test_checkmated ():
     p.w_rook_h1_location = f8
     p.b_rook_a8_location = a8
     p.b_rook_h8_location = h8
-    print p
-    print "moves are ",p.show_moves(1)
+    print(p)
+    print("moves are ",p.show_moves(1))
     #p = let_computer_move(p,wtm)
     m =  search_alphabeta(p,wtm)
     #print "m=",m
     #print "winner is",p.winner
     if (m == 'g3h2'):
-        print "    10.2 draw test: PASSED"
+        print("    10.2 draw test: PASSED")
         tests_passed += 1
     else:
-        print "    10.2 draw test: FAILED"
+        print("    10.2 draw test: FAILED")
         tests_failed += 1
 
 def test_promotion ():
@@ -4260,31 +4263,31 @@ def test_promotion ():
     wtm = 1
     fen = "3r3K/6P1/8/8/8/8/8/3k4"
     p = Position(fen)
-    print "11. test: promotion"
+    print("11. test: promotion")
     move_list = p.generate_moves(wtm=1)
     moves,san_moves = p.get_move_list(move_list)
     san = san_moves.values()
     print("    promotion moves are %s"%san)
     if ('Kh7' in san and 'g8=' in san):
-        print "    11.1 promotion moves: PASSED"
+        print("    11.1 promotion moves: PASSED")
         tests_passed += 1
     else:
-        print "    11.1 promotion moves: FAILED"
+        print("    11.1 promotion moves: FAILED")
         tests_failed += 1
 
 def test_skewered_ep ():
     global tests_passed, tests_failed, test_number
-    print "12. test: skewered ep"
+    print("12. test: skewered ep")
 
     fen = "8/4p3/8/r2P3K/8/8/8/4k3"
     p = Position(fen)
 
     p.make_move(Move(e7, e5, "pawn double move", "", ""))
     if position2fen(p) == "8/8/8/r2Pp2K/8/8/8/4k3":
-        print "    12.1 double pawn move: PASSED"
+        print("    12.1 double pawn move: PASSED")
         tests_passed += 1
     else:
-        print "    12.1 double pawn move: FAILED"
+        print("    12.1 double pawn move: FAILED")
         tests_failed += 1
 
     # After an en passant capture, both the capturer and the captured pawn
@@ -4294,10 +4297,10 @@ def test_skewered_ep ():
     moves,san_moves = p.get_move_list(move_list)
     san = san_moves.values()
     if "dxe6" not in san and "d6" in san:
-        print "    12.2 can not capture: PASSED"
+        print("    12.2 can not capture: PASSED")
         tests_passed += 1
     else:
-        print "    12.2 can not capture: FAILED"
+        print("    12.2 can not capture: FAILED")
         tests_failed += 1
 
 def test_icga ():
@@ -4345,16 +4348,16 @@ def test_icga ():
         for p in position_list:
             p.generate_moves(1)
     total1 = time.time() - start
-    print "Direct lookup: calls to generate_moves takes %s" % (total1)
+    print("Direct lookup: calls to generate_moves takes %s" % (total1))
 
     start = time.time()
     for i in range(10):
         for p in position_list:
             p.generate_moves_rot(1)
     total2 = time.time() - start
-    print "Rotated Bitboards: calls to generate_moves_rot takes %s" % (total2)
+    print("Rotated Bitboards: calls to generate_moves_rot takes %s" % (total2))
 
-    print "difference = %s" % (100*(total2-total1)/total1)
+    print("difference = %s" % (100*(total2-total1)/total1))
 
     # now rerun the tests in the opposite order to see if it makes
     # any difference.
@@ -4363,23 +4366,23 @@ def test_icga ():
         for p in position_list:
             p.generate_moves_rot(1)
     total2 = time.time() - start
-    print "Rotated Bitboards: calls to generate_moves_rot takes %s" % (total2)
+    print("Rotated Bitboards: calls to generate_moves_rot takes %s" % (total2))
 
     start = time.time()
     for i in range(10):
         for p in position_list:
             p.generate_moves(1)
     total1 = time.time() - start
-    print "Direct lookup: calls to generate_moves takes %s" % (total1)
+    print("Direct lookup: calls to generate_moves takes %s" % (total1))
 
-    print "difference = %s" % (100*(total2-total1)/total1)
+    print("difference = %s" % (100*(total2-total1)/total1))
 
-    print "total positions",count
+    print("total positions",count)
 
 
 def test ():
-    print "\nregression test"
-    print "================"
+    print("\nregression test")
+    print("================")
     test_init()
     test_search()
     test_generate_attacks()
@@ -4392,8 +4395,8 @@ def test ():
     test_checkmated()
     test_promotion()
     test_skewered_ep()
-    print "==========================================="
-    print "total tests PASSED=%s  FAILED=%s" % (tests_passed,tests_failed)
+    print("===========================================")
+    print("total tests PASSED=%s  FAILED=%s" % (tests_passed,tests_failed))
     sys.exit()
 
 
@@ -4405,9 +4408,9 @@ count = 0
 for i in range(1,9):
     for j in 'hgfedcba':
         name = '%s%s' % (j,i)
-        exec(name + "="+str(1L<<count)) # a1 = 1<<7, h1 = 1
+        exec(name + "="+str(1<<count)) # a1 = 1<<7, h1 = 1
         name = name.upper()
-        exec(name + "="+str(1L<<count)) # A1 = 1<<7, H1 = 1
+        exec(name + "="+str(1<<count)) # A1 = 1<<7, H1 = 1
         count = count + 1
 
 # this is a static evaluation table used to
@@ -4443,7 +4446,7 @@ QUEEN_VALUE = 891
 KING_VALUE = 40000
 MATE = 60000
 INFINITY = 100000
-ALL_ONES = (1L<<64) - 1
+ALL_ONES = (1<<64) - 1
 MOVER_HASH_INDEX = 64
 CASTLING_HASH_INDEX = 65
 ENPASSANT_HASH_INDEX = 66
@@ -4463,32 +4466,32 @@ bin2alg,bin2index,alg2bin = get_conversions()
 
 try:
     start = time.time()
-    bd = open("shatranj-data.bin","r")
-    print "...reading startup data"
-    knight_moves       = cPickle.load(bd)
-    king_moves         = cPickle.load(bd)
-    rank               = cPickle.load(bd)
-    rank_mask          = cPickle.load(bd)
-    rank_attacks       = cPickle.load(bd)
-    file               = cPickle.load(bd)
-    file_mask          = cPickle.load(bd)
-    file_attacks       = cPickle.load(bd)
-    diag_mask_ne       = cPickle.load(bd)
-    diag_mask_nw       = cPickle.load(bd)
-    diag_attacks_ne    = cPickle.load(bd)
-    diag_attacks_nw    = cPickle.load(bd)
-    above              = cPickle.load(bd)
-    below              = cPickle.load(bd)
-    left               = cPickle.load(bd)
-    right              = cPickle.load(bd)
-    white_squares      = cPickle.load(bd)
-    black_squares      = cPickle.load(bd)
-    piece_square_value = cPickle.load(bd)
+    bd = open("shatranj-data.bin","rb")
+    print("...reading startup data")
+    knight_moves       = pickle.load(bd)
+    king_moves         = pickle.load(bd)
+    rank               = pickle.load(bd)
+    rank_mask          = pickle.load(bd)
+    rank_attacks       = pickle.load(bd)
+    file               = pickle.load(bd)
+    file_mask          = pickle.load(bd)
+    file_attacks       = pickle.load(bd)
+    diag_mask_ne       = pickle.load(bd)
+    diag_mask_nw       = pickle.load(bd)
+    diag_attacks_ne    = pickle.load(bd)
+    diag_attacks_nw    = pickle.load(bd)
+    above              = pickle.load(bd)
+    below              = pickle.load(bd)
+    left               = pickle.load(bd)
+    right              = pickle.load(bd)
+    white_squares      = pickle.load(bd)
+    black_squares      = pickle.load(bd)
+    piece_square_value = pickle.load(bd)
     bd.close()
-    print "...total time to read data",time.time()-start
+    print("...total time to read data",time.time()-start)
 except:
     start = time.time()
-    print "...generating startup data"
+    print("...generating startup data")
     rank,rank_mask = get_ranks()
     file,file_mask = get_files()
     diag_mask_ne = get_diag_ne()
@@ -4501,36 +4504,36 @@ except:
     diag_attacks_ne = get_diag_attacks_ne()
     diag_attacks_nw = get_diag_attacks_nw()
     piece_square_value = generate_piece_square_values()
-    bd = open("shatranj-data.bin","w")
-    cPickle.dump(knight_moves,bd)
-    cPickle.dump(king_moves,bd)
-    cPickle.dump(rank,bd)
-    cPickle.dump(rank_mask,bd)
-    cPickle.dump(rank_attacks,bd)
-    cPickle.dump(file,bd)
-    cPickle.dump(file_mask,bd)
-    cPickle.dump(file_attacks,bd)
-    cPickle.dump(diag_mask_ne,bd)
-    cPickle.dump(diag_mask_nw,bd)
-    cPickle.dump(diag_attacks_ne,bd)
-    cPickle.dump(diag_attacks_nw,bd)
-    cPickle.dump(above,bd)
-    cPickle.dump(below,bd)
-    cPickle.dump(left,bd)
-    cPickle.dump(right,bd)
-    cPickle.dump(white_squares,bd)
-    cPickle.dump(black_squares,bd)
-    cPickle.dump(piece_square_value,bd)
+    bd = open("shatranj-data.bin","wb")
+    pickle.dump(knight_moves,bd)
+    pickle.dump(king_moves,bd)
+    pickle.dump(rank,bd)
+    pickle.dump(rank_mask,bd)
+    pickle.dump(rank_attacks,bd)
+    pickle.dump(file,bd)
+    pickle.dump(file_mask,bd)
+    pickle.dump(file_attacks,bd)
+    pickle.dump(diag_mask_ne,bd)
+    pickle.dump(diag_mask_nw,bd)
+    pickle.dump(diag_attacks_ne,bd)
+    pickle.dump(diag_attacks_nw,bd)
+    pickle.dump(above,bd)
+    pickle.dump(below,bd)
+    pickle.dump(left,bd)
+    pickle.dump(right,bd)
+    pickle.dump(white_squares,bd)
+    pickle.dump(black_squares,bd)
+    pickle.dump(piece_square_value,bd)
     bd.close()
-    print "...total time to generate data",time.time()-start
+    print("...total time to generate data",time.time()-start)
 
 # grab the opening book if we can
 try:
     bd = open("shatranj-book.bin")
-    book = cPickle.load(bd)
-    print "...found opening book shatranj-book.bin with %s positions" % len(book)
+    book = pickle.load(bd)
+    print("...found opening book shatranj-book.bin with %s positions" % len(book))
 except:
-    print "Warning: missing opening book shatranj-book.bin"
+    print("Warning: missing opening book shatranj-book.bin")
     book = {}
 
 # these hash tables are only used for testing
@@ -4575,3 +4578,4 @@ if __name__ == '__main__':
 #######################################################################
 # The End.
 #######################################################################
+
